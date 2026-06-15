@@ -41,3 +41,12 @@ The `test-infra/` CDK stack deploys real AWS resources (Bedrock KBs, EC2 instanc
 - **Commits**: Use [conventional commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`, `refactor:`, `docs:`, etc.
 - **Pull requests**: See PR guidelines ([Python](./strands-py/docs/PR.md), [TypeScript](./dev-docs/PR.md))
 - **CI**: The `ci.yml` merge gate detects which paths changed and runs only relevant checks
+
+## Reviewing Documentation Changes
+
+When a change touches documentation under `site/`, apply the documentation skills in `.agents/skills/` in addition to standard code review:
+
+- **`.agents/skills/docs-reviewer/SKILL.md`** — voice consistency, structure, terminology, and code-example quality.
+- **`.agents/skills/docs-audit/SKILL.md`** — technical accuracy against live SDK sources (import paths, method signatures, API correctness).
+
+Verify terminology against `.agents/references/terminology.md` and MDX authoring patterns against `.agents/references/mdx-authoring.md`. It is critical that you actually read these referenced source files before reviewing — their criteria do not apply if you only skim this summary.
