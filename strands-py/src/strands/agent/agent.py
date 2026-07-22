@@ -129,7 +129,7 @@ ContextManagerStrategy = Literal["auto", "agentic"]
 _CONTEXT_MANAGER_MAX_RESULT_TOKENS = 1_500
 """Benchmark-validated token threshold for offloading tool results."""
 
-_AGENTIC_CONTEXT_MANAGER_MAX_RESULT_TOKENS = 8_000
+_AGENTIC_CONTEXT_MANAGER_MAX_RESULT_TOKENS = 4_000
 """Higher offload threshold for agentic mode - the model manages its own context, so we preserve more inline."""
 
 _CONTEXT_MANAGER_PREVIEW_TOKENS = 750
@@ -138,7 +138,7 @@ _CONTEXT_MANAGER_PREVIEW_TOKENS = 750
 _CONTEXT_MANAGER_SUMMARY_RATIO = 0.3
 """Benchmark-validated ratio of messages to summarize on overflow."""
 
-_CONTEXT_MANAGER_COMPRESSION_THRESHOLD = 0.85
+_CONTEXT_MANAGER_COMPRESSION_THRESHOLD = 0.95
 """Benchmark-validated context window ratio that triggers proactive compression."""
 
 
