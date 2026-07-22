@@ -38,7 +38,7 @@ class TestContextManagerAuto:
 
     def test_summary_ratio_is_benchmark_default(self, mock_model):
         agent = Agent(model=mock_model, context_manager="auto")
-        assert agent.conversation_manager.summary_ratio == 0.3
+        assert agent.conversation_manager.summary_ratio == 0.4
 
     def test_proactive_compression_at_85_percent(self, mock_model):
         agent = Agent(model=mock_model, context_manager="auto")

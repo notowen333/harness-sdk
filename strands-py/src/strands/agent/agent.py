@@ -135,7 +135,7 @@ _AGENTIC_CONTEXT_MANAGER_MAX_RESULT_TOKENS = 8_000
 _CONTEXT_MANAGER_PREVIEW_TOKENS = 750
 """Benchmark-validated preview token count for offloaded results."""
 
-_CONTEXT_MANAGER_SUMMARY_RATIO = 0.3
+_CONTEXT_MANAGER_SUMMARY_RATIO = 0.4
 """Benchmark-validated ratio of messages to summarize on overflow."""
 
 _CONTEXT_MANAGER_COMPRESSION_THRESHOLD = 0.85
@@ -234,7 +234,7 @@ class Agent(AgentBase):
                 Defaults to an empty AgentState object.
             context_manager: Context management strategy. When set to ``"auto"``, composes
                 a ContextOffloader plugin (max_result_tokens=1500, preview_tokens=750) with a
-                SummarizingConversationManager (summary_ratio=0.3, compression_threshold=0.85)
+                SummarizingConversationManager (summary_ratio=0.4, compression_threshold=0.85)
                 using benchmark-validated defaults. If ``conversation_manager`` is also provided,
                 the user's conversation manager is used instead. Defaults to None (no context management).
 
