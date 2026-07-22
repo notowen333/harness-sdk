@@ -126,7 +126,7 @@ _DEFAULT_AGENT_ID = "default"
 ContextManagerStrategy = Literal["auto", "agentic"]
 """Supported values for the ``context_manager`` parameter."""
 
-_CONTEXT_MANAGER_MAX_RESULT_TOKENS = 1_500
+_CONTEXT_MANAGER_MAX_RESULT_TOKENS = 3_000
 """Benchmark-validated token threshold for offloading tool results."""
 
 _AGENTIC_CONTEXT_MANAGER_MAX_RESULT_TOKENS = 8_000
