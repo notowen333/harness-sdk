@@ -138,7 +138,7 @@ _CONTEXT_MANAGER_PREVIEW_TOKENS = 750
 _CONTEXT_MANAGER_SUMMARY_RATIO = 0.3
 """Benchmark-validated ratio of messages to summarize on overflow."""
 
-_CONTEXT_MANAGER_COMPRESSION_THRESHOLD = 0.85
+_CONTEXT_MANAGER_COMPRESSION_THRESHOLD = 0.95
 """Benchmark-validated context window ratio that triggers proactive compression."""
 
 
