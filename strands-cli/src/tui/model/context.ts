@@ -1,7 +1,7 @@
 import type { Model } from '@strands-agents/sdk'
 
-// Mirrors entries in strands-ts/src/models/defaults.ts that the pinned @strands-agents/sdk release lacks.
-// Remove once the CLI depends on an SDK release that includes them. Values from the Bedrock model cards:
+// Mirrors entries in strands-ts/src/models/defaults.ts that published @strands-agents/sdk releases lack.
+// Remove once the CLI's minimum SDK version includes them. Values from the Bedrock model cards:
 // https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-openai-gpt-6-astra.html
 // https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-zai-glm-4-7.html
 const FALLBACK_CONTEXT_WINDOWS: ReadonlyMap<string, number> = new Map([
