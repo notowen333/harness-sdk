@@ -327,7 +327,7 @@ describe('TUI mouse input', () => {
     input.write('\r')
     await vi.waitFor(() => expect(controller.getSnapshot().panel).toBeUndefined())
     expect(target.switchModel).toHaveBeenCalledOnce()
-    expect(frame().join('\n')).not.toContain('Models')
+    await vi.waitFor(() => expect(frame().join('\n')).not.toContain('Models'))
   })
 
   it.each([80, 60])('clicks live theme settings and opens the custom editor at %i columns', async (width) => {
