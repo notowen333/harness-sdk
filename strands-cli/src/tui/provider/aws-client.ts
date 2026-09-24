@@ -12,7 +12,6 @@ export async function discoverAwsCredentials(
   }
   const client = new STSClient({
     ...awsClientConfiguration(environment),
-    region: environment.AWS_REGION?.value ?? environment.AWS_DEFAULT_REGION?.value ?? 'us-east-1',
     maxAttempts: 1,
   })
   const abort = new AbortController()
@@ -64,14 +63,14 @@ export function awsClientConfiguration(environment: DetectedProviderEnvironment)
     !environment.AWS_PROFILE?.value && accessKeyId && secretAccessKey
       ? { accessKeyId, secretAccessKey, ...(sessionToken ? { sessionToken } : {}) }
       : undefined
-  const region = environment.AWS_REGION?.value ?? environment.AWS_DEFAULT_REGION?.value
+  const region = environment.AWS_REGION?.value ?? environment.AWS_DEFAULT_REGION?.value ?? 'us-east-1'
   const profile = environment.AWS_PROFILE?.value ?? 'default'
   return {
     ...awsConfigurationFiles({
       AWS_CONFIG_FILE: environment.AWS_CONFIG_FILE?.value,
       AWS_SHARED_CREDENTIALS_FILE: environment.AWS_SHARED_CREDENTIALS_FILE?.value,
     }),
-    ...(region ? { region } : {}),
+    region,
     profile,
     ...(credentials ? { credentials } : {}),
     // forceRefresh reruns the credential chain but retains its cached INI files.

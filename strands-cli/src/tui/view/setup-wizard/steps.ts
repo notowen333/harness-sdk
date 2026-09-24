@@ -6,7 +6,7 @@ import {
   type ProviderEnvironment,
   type ProviderId,
 } from '../../config.js'
-import { DEFAULT_HARNESS_AGENT_CONFIG, type HarnessAgentConfig } from '@strands-agents/harness'
+import { DEFAULT_HARNESS_AGENT_CONFIG, type BuiltinToolName, type HarnessAgentConfig } from '@strands-agents/harness'
 import type { AwsConfigurationDiscovery, LiteLlmDiscovery, OllamaDiscovery } from '../../provider/discovery.js'
 import { effortOptions, profileEffort, effortDisplayLabel, effortForModel } from '../../model/selection.js'
 import {
@@ -26,6 +26,7 @@ import {
 } from './profile-fields.js'
 import { canChooseDirectory } from '../../terminal/directory-picker.js'
 import type { ChatSettings } from '../../chat/types.js'
+import type { AgentProjectLanguage } from '../../project/import.js'
 import { SETTING_DEFINITIONS, VISUAL_SETTING_DEFINITIONS } from '../../settings.js'
 import { PERMISSION_CHOICES, permissionToolDescription, permissionToolNames } from '../../permissions/settings.js'
 import {
@@ -40,22 +41,21 @@ import {
 } from './providers.js'
 import type { AppearanceSettings, EditableField, SetupDraft, SetupFlow, WizardRow } from './types.js'
 
-export const MANUAL_STEPS = ['Model', 'Agent', 'Tools', 'Plugins & features', 'Data', 'Safety', 'Review'] as const
-export const APPEARANCE_STEP = MANUAL_STEPS.length + 1
+export const CUSTOMIZE_STEPS = ['Model', 'Agent', 'Tools', 'Plugins & features', 'Data', 'Safety', 'Review'] as const
+export const APPEARANCE_STEP = CUSTOMIZE_STEPS.length + 1
 export const OPENING_CHOICES = [
   { id: 'quickstart', title: 'Quickstart', description: 'Pick a model and start working with your harness!' },
-  { id: 'agent', title: 'Q&A', description: 'Answer a few questions, get a custom harness. No code required.' },
   {
-    id: 'manual',
-    title: 'Manual',
+    id: 'customize',
+    title: 'Customize',
     description: 'Customize your harness from scratch. Model, prompt, tools, and beyond.',
   },
   { id: 'import', title: 'Import', description: 'Load in your custom harness from a file or zip.' },
+  { id: 'export', title: 'Export', description: 'Save your harness as a TypeScript or Python project.' },
 ] as const
 const SETUP_STEP_INSTRUCTIONS = {
-  quickstart: ['Pick a model for your agent', "Choose your agent's tools", 'Choose plugins and features'],
-  agent: ['Pick a model for the assistant'],
-  manual: [
+  quickstart: ['Pick a model for your agent'],
+  customize: [
     'Pick a model for your agent',
     'Name and instruct your agent',
     "Choose your agent's tools",
@@ -65,17 +65,23 @@ const SETUP_STEP_INSTRUCTIONS = {
     'Review your agent',
   ],
   import: ['Choose an agent to import'],
+  export: ['Export your agent'],
 } as const satisfies Record<SetupFlow, readonly string[]>
 
 export function setupStepProgress(
   flow: SetupFlow | undefined,
   step: number
-): { current: number; total: number; instruction: string } | undefined {
-  if (!flow || step === 0 || step === APPEARANCE_STEP || (flow === 'import' && step === 1)) {
+): { current: number; total: number; instruction: string; label?: string } | undefined {
+  if (!flow || step === 0 || step === APPEARANCE_STEP || ((flow === 'import' || flow === 'export') && step === 1)) {
     return undefined
   }
-  const total = SETUP_STEP_INSTRUCTIONS[flow].length
-  return { current: step, total, instruction: SETUP_STEP_INSTRUCTIONS[flow][step - 1]! }
+  const instruction = SETUP_STEP_INSTRUCTIONS[flow][step - 1]!
+  if (flow !== 'customize') {
+    return { current: step, total: SETUP_STEP_INSTRUCTIONS[flow].length, instruction }
+  }
+  // Review closes the flow rather than counting as a step.
+  const total = CUSTOMIZE_STEPS.length - 1
+  return step > total ? { current: total, total, instruction, label: 'Review' } : { current: step, total, instruction }
 }
 
 // Fits beside the widest capability label in an 80-column terminal.
@@ -135,6 +141,40 @@ export function wizardSettingsRows(
   )
 }
 
+export function exportRows(
+  language: AgentProjectLanguage,
+  path: string,
+  exportedPath: string | undefined,
+  setLanguage: (language: AgentProjectLanguage) => void,
+  setEditing: (editing: { field: EditableField; value: string }) => void
+): WizardRow[] {
+  return [
+    {
+      id: 'export-language',
+      label: 'Language',
+      description: '',
+      choices: (['typescript', 'python'] as const).map((option) => ({
+        label: option === 'typescript' ? 'TypeScript' : 'Python',
+        value: option,
+        active: option === language,
+        activate: (): void => setLanguage(option),
+      })),
+      activate: noop,
+    },
+    {
+      id: 'export-path',
+      label: 'Save ZIP to',
+      description: path,
+      input: true,
+      field: 'exportPath',
+      activate: (): void => setEditing({ field: 'exportPath', value: path }),
+    },
+    ...(exportedPath
+      ? [{ id: 'export-saved', label: 'Saved', description: exportedPath, status: 'success' as const, activate: noop }]
+      : []),
+  ]
+}
+
 export function rowsForStep(
   step: number,
   flow: SetupFlow | undefined,
@@ -155,10 +195,10 @@ export function rowsForStep(
   credentialRejectionMessage?: string
 ): WizardRow[] {
   const environment = effectiveProviderEnvironment(providerEnvironment, detectedEnvironment, awsDiscovery)
-  if ((flow === 'quickstart' && step === 2) || (flow === 'manual' && step === 3)) {
+  if (flow === 'customize' && step === 3) {
     return toolSelectionRows(draft, setDraft, updateProfile)
   }
-  if ((flow === 'quickstart' && step === 3) || (flow === 'manual' && step === 4)) {
+  if (flow === 'customize' && step === 4) {
     return pluginSelectionRows(draft, setDraft, updateProfile)
   }
   const edit =
@@ -272,6 +312,41 @@ export function rowsForStep(
             active: option.active === true,
             activate: (): void => updateProfile({ effort: profileEffort(option.id) }),
           })),
+          activate: noop,
+        })
+      }
+      if (flow === 'quickstart') {
+        const nativeSearch = providerSupportsWebSearch(draft.profile.model)
+        const enabled = profileToolEnabled(draft.profile.builtinTools, 'web_search')
+        rows.push({
+          id: 'quickstart-web-search',
+          label: 'Web search',
+          // The Exa-on note is a warning rendered by the wizard.
+          description: enabled
+            ? "Provider's built-in search"
+            : nativeSearch
+              ? 'Built-in search available'
+              : 'No built-in search',
+          choices: [
+            {
+              label: 'Off',
+              active: !enabled,
+              activate: (): void =>
+                updateProfile({ builtinTools: withoutProfileTool(draft.profile.builtinTools, 'web_search') }),
+            },
+            {
+              label: nativeSearch ? 'Native' : 'Exa',
+              active: enabled,
+              activate: (): void => {
+                const withoutSearch = withoutProfileTool(draft.profile.builtinTools, 'web_search')
+                updateProfile({
+                  builtinTools: nativeSearch
+                    ? withProfileTool(withoutSearch, 'web_search')
+                    : withWebSearchFallback(withoutSearch),
+                })
+              },
+            },
+          ],
           activate: noop,
         })
       }
@@ -614,30 +689,47 @@ function pluginSelectionRows(
   ]
 }
 
-function toolRows(draft: SetupDraft, updateProfile: (update: Partial<HarnessAgentConfig>) => void): WizardRow[] {
-  const nativeSearch = providerSupportsWebSearch(draft.profile.model)
+export interface BuiltinToolChoice {
+  id: BuiltinToolName
+  description: string
+  active: boolean
+  /** Enabling it sends queries to Exa, the third-party search fallback. */
+  thirdParty: boolean
+}
+
+export function builtinToolChoices(profile: HarnessAgentConfig): BuiltinToolChoice[] {
+  const nativeSearch = providerSupportsWebSearch(profile.model)
   return BUILTIN_TOOLS.map(([id, description]) => {
-    // Without native search, web_search is the third-party Exa fallback: off unless opted into here.
-    const exa = id === 'web_search' && !nativeSearch
-    const active = exa
-      ? webSearchFallback(draft.profile.builtinTools) === 'exa'
-      : profileToolEnabled(draft.profile.builtinTools, id)
-    return {
-      id,
-      label: id,
-      description,
-      active,
-      activate: (): void => {
-        updateProfile({
-          builtinTools: active
-            ? withoutProfileTool(draft.profile.builtinTools, id)
-            : exa
-              ? withWebSearchFallback(draft.profile.builtinTools)
-              : withProfileTool(draft.profile.builtinTools, id),
-        })
-      },
-    }
+    // Without native search, web_search is the third-party Exa fallback: off unless opted into.
+    const thirdParty = id === 'web_search' && !nativeSearch
+    const active = thirdParty
+      ? webSearchFallback(profile.builtinTools) === 'exa'
+      : profileToolEnabled(profile.builtinTools, id)
+    return { id, description, active, thirdParty }
   })
+}
+
+export function withBuiltinToolChoice(
+  profile: HarnessAgentConfig,
+  choice: BuiltinToolChoice,
+  enabled: boolean
+): HarnessAgentConfig['builtinTools'] {
+  if (!enabled) return withoutProfileTool(profile.builtinTools, choice.id)
+  return choice.thirdParty
+    ? withWebSearchFallback(profile.builtinTools)
+    : withProfileTool(profile.builtinTools, choice.id)
+}
+
+function toolRows(draft: SetupDraft, updateProfile: (update: Partial<HarnessAgentConfig>) => void): WizardRow[] {
+  return builtinToolChoices(draft.profile).map((choice) => ({
+    id: choice.id,
+    label: choice.id,
+    description: choice.description,
+    active: choice.active,
+    activate: (): void => {
+      updateProfile({ builtinTools: withBuiltinToolChoice(draft.profile, choice, !choice.active) })
+    },
+  }))
 }
 
 function toggle<const T extends string>(values: readonly T[], value: T): T[] {
