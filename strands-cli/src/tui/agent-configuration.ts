@@ -13,7 +13,7 @@ import {
 import { Message, TextBlock, tool, type Agent, type JSONSchema, type Tool } from '@strands-agents/sdk'
 
 import { validateNoConfigSecrets } from './project/configuration.js'
-import { EXA_WEB_SEARCH_WARNING } from './builtin-tools.js'
+import { EXA_WEB_SEARCH_WARNING, builtinToolChoices, withBuiltinToolChoice } from './builtin-tools.js'
 import {
   PROVIDER_IDS,
   normalizeToolName,
@@ -25,7 +25,6 @@ import { resolveModelTarget, validateModelSelection } from './model/selection.js
 import { discoverProviderModels } from './provider/discovery.js'
 import type { ChatBuiltinToolsRuntime, ChatDiffPreview } from './chat/types.js'
 import { createDiffPreview } from './permissions/file-change-preview.js'
-import { builtinToolChoices, withBuiltinToolChoice } from './view/setup-wizard/steps.js'
 import { SETTING_DEFINITIONS, VISUAL_SETTING_DEFINITIONS, parseSettings } from './settings.js'
 
 const CONFIGURATION_SETTING_KEYS = new Set([

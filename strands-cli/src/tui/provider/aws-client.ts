@@ -63,6 +63,7 @@ export function awsClientConfiguration(environment: DetectedProviderEnvironment)
     !environment.AWS_PROFILE?.value && accessKeyId && secretAccessKey
       ? { accessKeyId, secretAccessKey, ...(sessionToken ? { sessionToken } : {}) }
       : undefined
+  // Detection folds the profile's configured region into AWS_REGION, so this default only covers a profile without one.
   const region = environment.AWS_REGION?.value ?? environment.AWS_DEFAULT_REGION?.value ?? 'us-east-1'
   const profile = environment.AWS_PROFILE?.value ?? 'default'
   return {

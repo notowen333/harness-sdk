@@ -6,13 +6,16 @@ import {
   type ProviderEnvironment,
   type ProviderId,
 } from '../../config.js'
-import { DEFAULT_HARNESS_AGENT_CONFIG, type BuiltinToolName, type HarnessAgentConfig } from '@strands-agents/harness'
+import { DEFAULT_HARNESS_AGENT_CONFIG, type HarnessAgentConfig } from '@strands-agents/harness'
 import type { AwsConfigurationDiscovery, LiteLlmDiscovery, OllamaDiscovery } from '../../provider/discovery.js'
 import { effortOptions, profileEffort, effortDisplayLabel, effortForModel } from '../../model/selection.js'
 import {
+  BUILTIN_TOOLS,
+  builtinToolChoices,
   enabledProfileTools,
   profileToolEnabled,
   webSearchFallback,
+  withBuiltinToolChoice,
   withProfileTool,
   withoutProfileTool,
   withWebSearchFallback,
@@ -87,16 +90,6 @@ export function setupStepProgress(
 // Fits beside the widest capability label in an 80-column terminal.
 export const CAPABILITY_DESCRIPTION_MAX_LENGTH = 44
 
-const BUILTIN_TOOLS = [
-  ['shell', 'Run shell commands'],
-  ['read', 'Read workspace files'],
-  ['write', 'Create files'],
-  ['edit', 'Apply targeted file edits'],
-  ['web_fetch', 'Fetch and summarize web pages'],
-  ['web_search', 'Search the web'],
-  ['programmatic_tool_caller', 'Orchestrate tools with sandboxed Python'],
-  ['subagent', 'Delegate focused work to a fresh subagent'],
-] as const
 const noop = (): void => {}
 
 export function appearanceSettings(settings: ChatSettings): AppearanceSettings {
@@ -687,37 +680,6 @@ function pluginSelectionRows(
       section: row.id === 'todos' || row.id === 'environment' ? 'Plugins' : 'Features',
     })),
   ]
-}
-
-export interface BuiltinToolChoice {
-  id: BuiltinToolName
-  description: string
-  active: boolean
-  /** Enabling it sends queries to Exa, the third-party search fallback. */
-  thirdParty: boolean
-}
-
-export function builtinToolChoices(profile: HarnessAgentConfig): BuiltinToolChoice[] {
-  const nativeSearch = providerSupportsWebSearch(profile.model)
-  return BUILTIN_TOOLS.map(([id, description]) => {
-    // Without native search, web_search is the third-party Exa fallback: off unless opted into.
-    const thirdParty = id === 'web_search' && !nativeSearch
-    const active = thirdParty
-      ? webSearchFallback(profile.builtinTools) === 'exa'
-      : profileToolEnabled(profile.builtinTools, id)
-    return { id, description, active, thirdParty }
-  })
-}
-
-export function withBuiltinToolChoice(
-  profile: HarnessAgentConfig,
-  choice: BuiltinToolChoice,
-  enabled: boolean
-): HarnessAgentConfig['builtinTools'] {
-  if (!enabled) return withoutProfileTool(profile.builtinTools, choice.id)
-  return choice.thirdParty
-    ? withWebSearchFallback(profile.builtinTools)
-    : withProfileTool(profile.builtinTools, choice.id)
 }
 
 function toolRows(draft: SetupDraft, updateProfile: (update: Partial<HarnessAgentConfig>) => void): WizardRow[] {
