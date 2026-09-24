@@ -174,6 +174,21 @@ export function frogStartupHeight(width: number, availableHeight: number): numbe
   return width >= SMALL_BRAND_WORD.width && availableHeight >= 8 ? 2 : 1
 }
 
+/** The width the lockup artwork occupies at `height`, for centering it within `width`. */
+export function frogStartupWidth(width: number, height: number): number {
+  const canvasWidth = Math.max(1, width)
+  if (canvasWidth >= FROG_FULL_LOCKUP_MIN_WIDTH && height >= lockupLayout(canvasWidth).height) {
+    return FROG_FULL_LOCKUP_MIN_WIDTH
+  }
+  if (canvasWidth >= BRAND_WORD.width && height >= wordOnlyHeight(BRAND_WORD.width)) {
+    return BRAND_WORD.width
+  }
+  if (canvasWidth >= SMALL_BRAND_WORD.width && height >= 2) {
+    return SMALL_BRAND_WORD.width
+  }
+  return Math.min(canvasWidth, 'STRANDS'.length)
+}
+
 export function frogStartupHitbox(width: number, height = lockupLayout(width).height): FrogStartupHitbox {
   const canvasWidth = Math.max(1, width)
   if (
