@@ -92,8 +92,8 @@ compiled output and skips all source-build behavior.
 ## Customize the agent
 
 Run `strands` or use `/setup` in chat to reopen the saved configuration. Quickstart and Customize
-edit the same profile. Import loads a harness from a file or zip, and Export saves the saved agent as a
-TypeScript or Python project.
+edit the same profile. Import loads a harness from a file or zip, and Resume returns to the configured
+harness. Use `/export` in chat to save the agent as a TypeScript or Python project.
 
 In interactive chat, the agent can also inspect and change its own configuration with `strands_config`.
 For example: “Use high reasoning, disable shell and delegation, and keep responses concise.”

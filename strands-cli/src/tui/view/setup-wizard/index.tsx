@@ -22,8 +22,7 @@ import {
   type CliConfigStore,
   type ProviderId,
 } from '../../config.js'
-import { importAgentProject, type AgentProjectLanguage } from '../../project/import.js'
-import { exportFileName, exportSavedAgent } from '../../project/export.js'
+import { importAgentProject } from '../../project/import.js'
 import { configurationFromStore, type SetupChange } from '../../agent-configuration.js'
 import type { ChatSettings } from '../../chat/types.js'
 import type { SettingsCategory } from '../../settings.js'
@@ -31,12 +30,7 @@ import { DEFAULT_SETTINGS_CATEGORY, SETTINGS_CATEGORIES } from '../../settings.j
 import { parseMouseInput } from '../../terminal/mouse-input.js'
 import { emptyEditor, graphemes, reduceInputSequence } from '../../terminal/composer.js'
 import { errorMessage, sanitizeTerminalText } from '../../terminal/sanitize.js'
-import {
-  canChooseDirectory,
-  chooseAgentProject,
-  chooseDirectory,
-  chooseSaveFile,
-} from '../../terminal/directory-picker.js'
+import { canChooseDirectory, chooseAgentProject, chooseDirectory } from '../../terminal/directory-picker.js'
 import { setTerminalMouseMotion } from '../../terminal/terminal.js'
 import {
   elementAtMouse,
@@ -68,7 +62,6 @@ import {
   APPEARANCE_STEP,
   appearanceSettings,
   CUSTOMIZE_STEPS,
-  exportRows,
   OPENING_CHOICES,
   rowsForStep,
   setupStepProgress,
@@ -182,9 +175,6 @@ function SetupWizardContent({
   })
   const [profileBaseDir] = useState<string | null | undefined>(() => config.snapshot().profileBaseDir)
   const [importPath, setImportPath] = useState('')
-  const [exportLanguage, setExportLanguage] = useState<AgentProjectLanguage>('typescript')
-  const [exportPath, setExportPath] = useState('')
-  const [exportedPath, setExportedPath] = useState<string>()
   const [editing, setEditing] = useState<{ field: EditableField; value: string; cursor?: number }>()
   const [pathCompletionIndex, setPathCompletionIndex] = useState(-1)
   const [error, setError] = useState<string>()
@@ -308,9 +298,8 @@ function SetupWizardContent({
   const isCapabilities = isTools || isPlugins
   const isPermissions = flow === 'customize' && step === 6
   const isImport = flow === 'import' && step === 1
-  const isExport = flow === 'export' && step === 1
   const hasExternalActions =
-    !isSettings && (isProviderSetup || isImport || isExport || isCapabilities || isAppearance || flow === 'customize')
+    !isSettings && (isProviderSetup || isImport || isCapabilities || isAppearance || flow === 'customize')
   const bubbleWidth = Math.max(1, Math.min(isProviderSetup ? 144 : 112, width - 2))
   const lockupWidth = Math.max(1, width - 2)
   const brandFrame = setupBrandFrame(lockupWidth, height)
@@ -320,7 +309,7 @@ function SetupWizardContent({
   const openingColumns = lockupWidth >= 64 ? 2 : 1
   const openingRows = Math.ceil(OPENING_CHOICES.length / openingColumns)
   const openingRowGap = openingColumns === 2 ? 2 : 1
-  const openingContentHeight = height - brandHeight - navigationHeight - Number(error !== undefined)
+  const openingContentHeight = height - brandHeight - navigationHeight - (error ? 2 : 0)
   const openingTopGap =
     openingContentHeight >= openingRows * (openingColumns === 2 ? 9 : 5) + (openingRows - 1) * openingRowGap + 3
       ? 3
@@ -384,17 +373,6 @@ function SetupWizardContent({
     [readyProviders, unavailableCredentialProvider]
   )
 
-  const agentName = draft.profile.name
-  const changeExportLanguage = useCallback(
-    (language: AgentProjectLanguage): void => {
-      setExportLanguage(language)
-      setExportedPath(undefined)
-      setExportPath((path) =>
-        path === exportFileName(agentName, exportLanguage) ? exportFileName(agentName, language) : path
-      )
-    },
-    [agentName, exportLanguage]
-  )
   const rows = useMemo<WizardRow[]>(() => {
     const stepRows = isAppearance
       ? wizardSettingsRows(
@@ -403,27 +381,25 @@ function SetupWizardContent({
           openAppearance,
           'all'
         ).filter(({ section }) => section === settingsCategory)
-      : isExport
-        ? exportRows(exportLanguage, exportPath, exportedPath, changeExportLanguage, setEditing)
-        : rowsForStep(
-            step,
-            flow,
-            draft,
-            importPath,
-            providerEnvironment,
-            detectedEnvironment,
-            quickstartProvider,
-            setupReadyProviders,
-            awsDiscovery,
-            ollamaDiscovery,
-            setDraft,
-            updateProfile,
-            setEditing,
-            liteLlmDiscovery,
-            credentialRejectedProvider,
-            credentialValidationProvider,
-            providerModels.error
-          )
+      : rowsForStep(
+          step,
+          flow,
+          draft,
+          importPath,
+          providerEnvironment,
+          detectedEnvironment,
+          quickstartProvider,
+          setupReadyProviders,
+          awsDiscovery,
+          ollamaDiscovery,
+          setDraft,
+          updateProfile,
+          setEditing,
+          liteLlmDiscovery,
+          credentialRejectedProvider,
+          credentialValidationProvider,
+          providerModels.error
+        )
     return isProviderSetup
       ? [
           ...stepRows,
@@ -457,11 +433,6 @@ function SetupWizardContent({
     draft,
     flow,
     importPath,
-    isExport,
-    exportLanguage,
-    exportPath,
-    exportedPath,
-    changeExportLanguage,
     ollamaDiscovery,
     liteLlmDiscovery,
     providerEnvironment,
@@ -478,8 +449,8 @@ function SetupWizardContent({
   const hasSelectedModel = deselectedModel !== draft.profile.model
   const canContinue =
     step !== 1 ||
-    (flow === 'import' || flow === 'export'
-      ? (flow === 'import' ? importPath : exportPath).trim().length > 0
+    (flow === 'import'
+      ? importPath.trim().length > 0
       : isProviderSetup
         ? hasSelectedModel &&
           selectedModelProvider === quickstartProvider &&
@@ -538,11 +509,10 @@ function SetupWizardContent({
         ? Math.min(9 + Math.max(0, rows.length - 3) * rowHeight + extraRows, availableBubbleHeight)
         : isAppearance
           ? availableBubbleHeight
-          : (flow === 'customize' && !isProviderSetup) || isExport
+          : flow === 'customize' && !isProviderSetup
             ? Math.min(rows.length * rowHeight + 3 + extraRows, availableBubbleHeight)
             : availableBubbleHeight
-  const panelChromeHeight =
-    isProviderSetup || isCapabilities ? 0 : isAppearance || isExport || flow === 'customize' ? 2 : 4
+  const panelChromeHeight = isProviderSetup || isCapabilities ? 0 : isAppearance || flow === 'customize' ? 2 : 4
   const rowCapacity = isAppearance
     ? settingsCategory === 'Appearance' && bubbleHeight < 18
       ? 1
@@ -608,9 +578,7 @@ function SetupWizardContent({
   )
   const directoryRows = new Map(
     rows.flatMap((row, index) =>
-      canChooseDirectory() &&
-      !row.disabled &&
-      (row.field === 'memoryDir' || row.field === 'skills' || row.field === 'exportPath')
+      canChooseDirectory() && !row.disabled && (row.field === 'memoryDir' || row.field === 'skills')
         ? [[index, row.field] as const]
         : []
     )
@@ -1049,7 +1017,7 @@ function SetupWizardContent({
     setFocusedAction(undefined)
   }
 
-  function browseForDirectory(field: 'importPath' | 'exportPath' | 'memoryDir' | 'skills'): void {
+  function browseForDirectory(field: 'importPath' | 'memoryDir' | 'skills'): void {
     if (choosingDirectoryRef.current) {
       return
     }
@@ -1060,22 +1028,15 @@ function SetupWizardContent({
     const selection =
       field === 'importPath'
         ? chooseAgentProject()
-        : field === 'exportPath'
-          ? chooseSaveFile('Export harness project', exportFileName(draft.profile.name, exportLanguage))
-          : chooseDirectory(
-              field === 'memoryDir'
-                ? 'Choose a directory for agent memory'
-                : 'Choose a directory containing agent skills'
-            )
+        : chooseDirectory(
+            field === 'memoryDir' ? 'Choose a directory for agent memory' : 'Choose a directory containing agent skills'
+          )
     void selection
       .then((path) => {
         if (!path) return
         if (field === 'importPath') {
           setImportPath(path)
           setSelection(0)
-        } else if (field === 'exportPath') {
-          setExportPath(path)
-          setExportedPath(undefined)
         } else {
           updateProfile(field === 'skills' ? { skills: [path] } : { memory: memoryForDir(path) })
         }
@@ -1098,11 +1059,7 @@ function SetupWizardContent({
       setFlow(nextFlow)
       setStep(1)
       setError(undefined)
-      if (nextFlow === 'export') {
-        setSelection(0)
-        setExportedPath(undefined)
-        setExportPath(exportFileName(draft.profile.name, exportLanguage))
-      } else if (nextFlow !== 'import') {
+      if (nextFlow !== 'import') {
         const provider = providerFromModel(draft.profile.model) ?? 'bedrock'
         if (nextFlow === 'quickstart') {
           setDraft(quickstartDraft(provider, effectiveEnvironment))
@@ -1114,6 +1071,18 @@ function SetupWizardContent({
         setImportPath('')
       }
     })
+  }
+
+  function chooseOpeningChoice(choice: (typeof OPENING_CHOICES)[number]['id']): void {
+    if (choice !== 'resume') {
+      chooseFlow(choice)
+      return
+    }
+    if (config.needsSetup()) {
+      setError('No harness is ready to resume yet. Choose Quickstart or Customize to create one, or Import your own.')
+      return
+    }
+    onCancel?.(0)
   }
 
   function completeSetup(completedDraft: SetupDraft = draft, agentProject?: string): void {
@@ -1165,29 +1134,16 @@ function SetupWizardContent({
       })
   }
 
-  function runExport(): void {
-    setSaving(true)
-    setError(undefined)
-    void exportSavedAgent(config.snapshot(), exportLanguage, exportPath)
-      .then(setExportedPath)
-      .catch((cause: unknown) => setError(errorMessage(cause)))
-      .finally(() => setSaving(false))
-  }
-
   function continueFlow(): void {
     if (editing || selecting || saving) {
       return
     }
     if (step === 0) {
-      chooseFlow(OPENING_CHOICES[selection]!.id)
+      chooseOpeningChoice(OPENING_CHOICES[selection]!.id)
       return
     }
     if (isAppearance) {
       completeSetup()
-      return
-    }
-    if (flow === 'export') {
-      runExport()
       return
     }
     if (flow === 'import') {
@@ -1329,9 +1285,6 @@ function SetupWizardContent({
     }
     if (editing.field === 'importPath') {
       setImportPath(value)
-    } else if (editing.field === 'exportPath') {
-      setExportPath(value)
-      setExportedPath(undefined)
     } else if (editing.field === 'memoryDir') {
       updateProfile({ memory: memoryForDir(value) })
     } else if (editing.field === 'skills') {
@@ -1369,7 +1322,7 @@ function SetupWizardContent({
 
   function activateRow(index: number): void {
     if (step === 0) {
-      chooseFlow(OPENING_CHOICES[index]!.id)
+      chooseOpeningChoice(OPENING_CHOICES[index]!.id)
       return
     }
     if (isImport && index === 1) {
@@ -1958,16 +1911,12 @@ function SetupWizardContent({
     (flow === 'customize' && step === CUSTOMIZE_STEPS.length) ||
     (flow === 'import' && step === 1)
   const primaryLabel = saving
-    ? isExport
-      ? 'Exporting...'
-      : 'Saving...'
-    : isExport
-      ? 'Export'
-      : isSetupCompletion
-        ? deferred || !config.needsSetup()
-          ? 'Save and Launch'
-          : 'Launch Strands harness'
-        : 'Continue'
+    ? 'Saving...'
+    : isSetupCompletion
+      ? deferred || !config.needsSetup()
+        ? 'Save and Launch'
+        : 'Launch Strands harness'
+      : 'Continue'
   const escapeAction = editing || selecting ? 'cancel' : step === 0 ? 'exit' : 'back'
   const navigationHints = editing
     ? [
@@ -2077,16 +2026,10 @@ function SetupWizardContent({
               overflow="hidden"
               backgroundColor={PANEL_BACKGROUND}
             >
-              {!isAppearance && (isExport || (flow === 'customize' && !isProviderSetup && !isCapabilities)) ? (
+              {!isAppearance && flow === 'customize' && !isProviderSetup && !isCapabilities ? (
                 <Box paddingX={1} marginBottom={1} justifyContent="space-between" flexShrink={0}>
                   <Text bold color={accent}>
-                    {isSettings
-                      ? 'Settings'
-                      : isAppearance
-                        ? 'Appearance'
-                        : isExport
-                          ? 'Export your agent'
-                          : CUSTOMIZE_STEPS[step - 1]}
+                    {isSettings ? 'Settings' : isAppearance ? 'Appearance' : CUSTOMIZE_STEPS[step - 1]}
                   </Text>
                   {customizeOverflowLabel ? <Text dimColor>{customizeOverflowLabel}</Text> : null}
                 </Box>

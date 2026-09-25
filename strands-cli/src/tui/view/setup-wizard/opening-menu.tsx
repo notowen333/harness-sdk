@@ -112,7 +112,11 @@ export function OpeningMenu({
             )
           })}
         </Box>
-        {error ? <Text color="red">{error}</Text> : null}
+        {error ? (
+          <Box width={gridWidth} marginLeft={left} marginTop={1}>
+            <Text color="red">{error}</Text>
+          </Box>
+        ) : null}
       </Box>
     </FadeIn>
   )
