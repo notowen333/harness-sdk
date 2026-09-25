@@ -1,12 +1,8 @@
-import { execFile, spawn } from 'node:child_process'
-import { promisify } from 'node:util'
+import { spawn } from 'node:child_process'
 
 import { readCliVersion } from '../tui/package-version.js'
-import { CLI_PACKAGE } from '../tui/update-check.js'
-
-const execFileAsync = promisify(execFile)
-// Node refuses to spawn a Windows `.cmd` file without a shell; the arguments are fixed, so none are user-controlled.
-const USE_SHELL = process.platform === 'win32'
+import { CLI_PACKAGE, compareVersions, publishedVersion } from '../tui/update-check.js'
+import { captureCommand, npmInvocation } from '../tui/npm.js'
 
 export interface UpdateRunner {
   capture(command: string, args: string[]): Promise<string>
@@ -19,6 +15,7 @@ export interface UpdateOptions {
   output?: Pick<NodeJS.WriteStream, 'write'>
   errorOutput?: Pick<NodeJS.WriteStream, 'write'>
   platform?: NodeJS.Platform
+  commandShell?: string
 }
 
 /** Update the globally installed CLI through npm. */
@@ -26,8 +23,11 @@ export async function updateCli(options: UpdateOptions = {}): Promise<number> {
   const currentVersion = options.currentVersion ?? readCliVersion()
   const output = options.output ?? process.stdout
   const errorOutput = options.errorOutput ?? process.stderr
-  const command = (options.platform ?? process.platform) === 'win32' ? 'npm.cmd' : 'npm'
   const runner = options.runner ?? nodeUpdateRunner
+  const invocationOptions = {
+    ...(options.platform !== undefined ? { platform: options.platform } : {}),
+    ...(options.commandShell !== undefined ? { commandShell: options.commandShell } : {}),
+  }
 
   if (currentVersion.includes('development')) {
     errorOutput.write(
@@ -37,16 +37,24 @@ export async function updateCli(options: UpdateOptions = {}): Promise<number> {
   }
 
   try {
-    const latestVersion = publishedVersion(
-      await runner.capture(command, ['view', `${CLI_PACKAGE}@latest`, 'version', '--json'])
-    )
-    if (currentVersion === latestVersion) {
-      output.write(`Strands CLI ${currentVersion} is already up to date.\n`)
+    const lookup = npmInvocation(['view', `${CLI_PACKAGE}@latest`, 'version', '--json'], invocationOptions)
+    const latestVersion = publishedVersion(await runner.capture(lookup.command, lookup.args))
+    const versionOrder = compareVersions(latestVersion, currentVersion)
+    if (versionOrder === undefined) {
+      throw new Error(`npm returned an invalid package version ${JSON.stringify(latestVersion)}`)
+    }
+    if (versionOrder !== 1) {
+      output.write(
+        versionOrder === 0
+          ? `Strands CLI ${currentVersion} is already up to date.\n`
+          : `Strands CLI ${currentVersion} is newer than npm latest ${latestVersion}; no update was installed.\n`
+      )
       return 0
     }
 
     output.write(`Updating Strands CLI from ${currentVersion} to ${latestVersion}...\n`)
-    const exitCode = await runner.inherit(command, ['install', '--global', `${CLI_PACKAGE}@latest`])
+    const install = npmInvocation(['install', '--global', `${CLI_PACKAGE}@${latestVersion}`], invocationOptions)
+    const exitCode = await runner.inherit(install.command, install.args)
     if (exitCode !== 0) {
       errorOutput.write(
         `error: Update failed with exit code ${exitCode}. Retry with \`npm install --global ${CLI_PACKAGE}@latest\`.\n`
@@ -64,12 +72,11 @@ export async function updateCli(options: UpdateOptions = {}): Promise<number> {
 
 const nodeUpdateRunner: UpdateRunner = {
   async capture(command, args) {
-    const { stdout } = await execFileAsync(command, args, { encoding: 'utf8', shell: USE_SHELL })
-    return stdout
+    return captureCommand(command, args)
   },
   async inherit(command, args) {
     return new Promise<number>((resolve, reject) => {
-      const child = spawn(command, args, { stdio: 'inherit', shell: USE_SHELL })
+      const child = spawn(command, args, { stdio: 'inherit' })
       child.once('error', reject)
       child.once('exit', (code, signal) => {
         if (signal) {
@@ -80,12 +87,4 @@ const nodeUpdateRunner: UpdateRunner = {
       })
     })
   },
-}
-
-function publishedVersion(output: string): string {
-  const parsed = JSON.parse(output) as unknown
-  if (typeof parsed !== 'string' || !parsed.trim()) {
-    throw new Error('npm returned an invalid package version')
-  }
-  return parsed.trim()
 }
