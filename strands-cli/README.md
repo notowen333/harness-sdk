@@ -59,6 +59,12 @@ Or run it on demand without installing, using `npx`:
 npx @strands-agents/cli
 ```
 
+Update a global installation with:
+
+```bash
+strands update
+```
+
 On the first interactive launch, the intro animation plays before the setup panel opens. Quickstart
 lets you choose providers and a model, then select tools, skills, MCP, and other capabilities before
 launching. Select or deselect all, or toggle individual capabilities. Customize setup also

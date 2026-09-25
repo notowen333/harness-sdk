@@ -40,6 +40,7 @@ export function OpeningMenu({
   topGap,
   animate,
   error,
+  availableUpdate,
   onRowElement,
 }: {
   width: number
@@ -51,6 +52,7 @@ export function OpeningMenu({
   topGap: number
   animate: boolean
   error?: string
+  availableUpdate?: string
   onRowElement(index: number, element: DOMElement | null): void
 }): ReactElement {
   const palette = useTheme()
@@ -112,6 +114,14 @@ export function OpeningMenu({
             )
           })}
         </Box>
+        {availableUpdate ? (
+          <Box width={gridWidth} marginLeft={left} marginTop={1}>
+            <Text wrap="truncate-end">
+              <Text color={palette.accent}>Strands CLI {availableUpdate} is available.</Text>
+              <Text color={palette.muted}> Run `strands update` to install it.</Text>
+            </Text>
+          </Box>
+        ) : null}
         {error ? (
           <Box width={gridWidth} marginLeft={left} marginTop={1}>
             <Text color="red">{error}</Text>

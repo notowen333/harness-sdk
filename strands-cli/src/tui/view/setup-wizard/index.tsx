@@ -77,6 +77,7 @@ import { useProviderDiscovery, useProviderDiscoveryEffects } from './use-provide
 import type { AppearanceSettings, EditableField, SelectOption, SetupDraft, SetupFlow, WizardRow } from './types.js'
 import { importPathCompletions } from './path-completion.js'
 import { SetupProgress } from './progress.js'
+import { availableCliUpdate } from '../../update-check.js'
 
 type SetupAction = 'back' | 'next' | 'settings' | `browse:${number}`
 type SetupControl =
@@ -111,6 +112,7 @@ function SetupWizardContent({
   onComplete,
   onCancel,
   initialSettings,
+  checkForUpdate = availableCliUpdate,
 }: {
   appearance: AppearanceSettings
   setAppearance: Dispatch<SetStateAction<AppearanceSettings>>
@@ -120,6 +122,8 @@ function SetupWizardContent({
   onComplete(change?: SetupChange): void
   onCancel?(exitCode: 0 | 130): void
   initialSettings?: Partial<ChatSettings>
+  /** Resolves a newer published CLI version to announce on the opening menu. */
+  checkForUpdate?(): Promise<string | undefined>
 }): ReactElement {
   const { stdout } = useStdout()
   const { columns, rows: terminalRows } = useWindowSize()
@@ -178,6 +182,7 @@ function SetupWizardContent({
   const [editing, setEditing] = useState<{ field: EditableField; value: string; cursor?: number }>()
   const [pathCompletionIndex, setPathCompletionIndex] = useState(-1)
   const [error, setError] = useState<string>()
+  const [availableUpdate, setAvailableUpdate] = useState<string>()
   const [saving, setSaving] = useState(false)
   const [choosingDirectory, setChoosingDirectory] = useState(false)
   const choosingDirectoryRef = useRef(false)
@@ -239,6 +244,20 @@ function SetupWizardContent({
   useEffect(() => {
     setPathCompletionIndex(-1)
   }, [pathEditing?.value])
+  useEffect(() => {
+    if (appearanceOnly) {
+      return
+    }
+    let active = true
+    void checkForUpdate().then((version) => {
+      if (active) {
+        setAvailableUpdate(version)
+      }
+    })
+    return (): void => {
+      active = false
+    }
+  }, [appearanceOnly, checkForUpdate])
   const isAppearance = step === APPEARANCE_STEP
   const isSettings = isAppearance && settingsReturn !== undefined
   const progress = appearanceOnly || isSettings ? undefined : setupStepProgress(flow, step)
@@ -1998,6 +2017,7 @@ function SetupWizardContent({
             topGap={openingTopGap}
             animate={appearance.animations}
             {...(error ? { error } : {})}
+            {...(availableUpdate ? { availableUpdate } : {})}
             onRowElement={(index, element) => registerElement(rowElements.current, index, element)}
           />
         </Fade>
